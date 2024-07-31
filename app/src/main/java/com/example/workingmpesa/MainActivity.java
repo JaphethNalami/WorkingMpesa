@@ -2,12 +2,14 @@ package com.example.workingmpesa;
 
 import android.app.ProgressDialog;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.workingmpesa.Model.STKCallbackResponse;
 import com.example.workingmpesa.Services.DarajaApiClient;
 import com.example.workingmpesa.databinding.ActivityMainBinding;
 import com.example.workingmpesa.Model.AccessToken;
@@ -87,7 +89,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    // Method to perform STK push
     public void performSTKPush(String phone_number, String amount) {
         // Show progress dialog while processing request
         mProgressDialog.setMessage("Processing your request");
@@ -118,11 +119,10 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 "254715798225",  // PartyA
                 "174379",  // PartyB
                 Utils.sanitizePhoneNumber(phone_number),  // PhoneNumber
-
-
                 "https://mydomain.com/path",  // CallBackURL
                 "Smart Sales Tracker",  // AccountReference
                 "Payment of X"  // TransactionDesc
+
         );
 
         // Disable access token retrieval after first call
@@ -141,8 +141,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         // Log success message if request is successful
                         Timber.d("post submitted to API. %s", response.body());
 
+                        // Start checking transaction status
+                        checkTransactionStatus(response.body().getCheckoutRequestID());
+
                         // Display success message
-                        Toast.makeText(MainActivity.this, "Success", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Request sent. Please complete payment on your phone.", Toast.LENGTH_SHORT).show();
                     } else {
                         if (response.errorBody() != null) {
 
@@ -167,4 +170,32 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
         });
     }
+
+
+    public void checkTransactionStatus(String checkoutRequestID) {
+        // Simulate checking transaction status with a delayed task
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Normally, you would call your server to get the transaction status
+                // For demonstration, we'll simulate a successful transaction response
+                STKCallbackResponse response = new STKCallbackResponse();
+                response.setResultCode(0); // 0 indicates success in M-Pesa API
+
+                handleTransactionResponse(response);
+            }
+        }, 30000); // Check after 30 seconds
+    }
+
+    public void handleTransactionResponse(STKCallbackResponse response) {
+        if (response.getResultCode() == 0) {
+            // Transaction was successful
+            Toast.makeText(this, "Transaction completed successfully", Toast.LENGTH_SHORT).show();
+        } else {
+            // Transaction failed
+            Toast.makeText(this, "Transaction failed: " + response.getResultDesc(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
 }
