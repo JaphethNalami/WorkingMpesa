@@ -3,6 +3,7 @@ package com.example.workingmpesa;
 import android.app.ProgressDialog;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -14,6 +15,8 @@ import com.example.workingmpesa.Services.DarajaApiClient;
 import com.example.workingmpesa.databinding.ActivityMainBinding;
 import com.example.workingmpesa.Model.AccessToken;
 import com.example.workingmpesa.Model.STKPush;
+import com.example.workingmpesa.Model.MpesaRequest;
+import com.google.gson.Gson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -29,6 +32,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private DarajaApiClient mApiClient;
     private ProgressDialog mProgressDialog;
     private ActivityMainBinding binding;
+    private String token,encodedPassword,timestamp;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -67,6 +71,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                     // Set auth token if request is successful
                     mApiClient.setAuthToken(response.body().accessToken);
+
+                    // Store token for later use
+                    token = response.body().accessToken;
                 }
             }
 
@@ -97,12 +104,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mProgressDialog.show();
 
         // Generate encoded password for authentication
-        String timestamp = Utils.getTimestamp();
+        timestamp = Utils.getTimestamp();
         String toEncode = "174379" + "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" + timestamp;
 
         // Encode password using Base64
         byte[] byteArray = toEncode.getBytes(StandardCharsets.UTF_8);
-        String encodedPassword;
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             encodedPassword = Base64.getEncoder().encodeToString(byteArray);
         } else {
@@ -171,31 +177,45 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         });
     }
 
-
     public void checkTransactionStatus(String checkoutRequestID) {
         // Simulate checking transaction status with a delayed task
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                // Normally, you would call your server to get the transaction status
-                // For demonstration, we'll simulate a successful transaction response
-                STKCallbackResponse response = new STKCallbackResponse();
-                response.setResultCode(0); // 0 indicates success in M-Pesa API
+                // Call MpesaRequest to get transaction status
+                MpesaRequest mpesaRequest = new MpesaRequest();
 
-                handleTransactionResponse(response);
+                //get access token from responce body
+
+                mpesaRequest.sendRequest("174379", encodedPassword, timestamp, checkoutRequestID, token, new MpesaRequest.MpesaRequestCallback() {
+                    @Override
+                    public void onSuccess(String response) {
+                        // Handle the response
+                        Log.d("Transaction status response: %s", response);
+                        // Parse the response and handle transaction status
+                        //convert response data to dictionary
+                        Gson gson = new Gson();
+                        STKCallbackResponse stkCallbackResponse = gson.fromJson(response, STKCallbackResponse.class);
+
+                        //if result code is 0, transaction is successful
+                        if (stkCallbackResponse.getResultCode().equals("0")) {
+                            // Handle successful transaction
+                            System.out.println("Transaction successful");
+                        } else {
+                            // Handle failed transaction
+                            System.out.println("Transaction failed");
+                        }
+
+
+                    }
+
+                    @Override
+                    public void onFailure(String error) {
+                        Timber.e("Failed to get transaction status: %s", error);
+                    }
+                });
             }
         }, 30000); // Check after 30 seconds
     }
-
-    public void handleTransactionResponse(STKCallbackResponse response) {
-        if (response.getResultCode() == 0) {
-            // Transaction was successful
-            Toast.makeText(this, "Transaction completed successfully", Toast.LENGTH_SHORT).show();
-        } else {
-            // Transaction failed
-            Toast.makeText(this, "Transaction failed: " + response.getResultDesc(), Toast.LENGTH_SHORT).show();
-        }
-    }
-
 
 }
